@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 
+/*
+    BUILD COMMAND: gcc -fsanitize=address -o base64 base64.c
+*/
+
 // base64 (standard) table
 char dictionary[64 + 1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -37,18 +41,20 @@ int getIndexFromStr(char *str, char *subStr) {
     return pos;
 }
 
-
 /* 
-    Encodes UTF-8 msg into a base64 string. Base64 string is stored in output.
+    Encodes a message into a base64 string. Base64 string is stored in output.
 */
 void encode(char *msg, char *output) {
-    int bitIndex = 0;
-    int msgBitLen = strlen(msg) * 8;
-    int base64Len = getBase64EncodeLen(msg);
-    int currLen = 0;
-    char base64Str[base64Len + 1];
+    // each three bytes of msg are converted to four base64 encoding
+    int msgLen = strlen(msg);
+    int msgIndex = 0;
+    
+    int finalBase64Len = getBase64EncodeLen(msg);
+    char base64Str[finalBase64Len + 1];
+    int base64Index = 0;
 
-    // constructing the base64 string
+    /*
+    //constructing the base64 string
     while (bitIndex < msgBitLen) {
         unsigned int value = 0;
 
@@ -70,22 +76,50 @@ void encode(char *msg, char *output) {
         }
 
         // add the base64 char to final string
-        base64Str[currLen] = dictionary[value];
-        currLen++;
+        base64Str[base64Index] = dictionary[value];
+        base64Index++;
+    }
+    */
+
+    // temp value store for constructing encoding char
+    unsigned int value = 0;
+    int valueIndex = 0;
+
+    while (msgIndex < msgLen) {
+        unsigned char currMsgChar = msg[msgIndex];
+
+        // each msg char is 8 bits long
+        for (int offset = 0; offset < 8; offset++) {
+            value = value << 1;
+            value = ((currMsgChar >> (7 - offset)) & 1) | value;
+            valueIndex++;
+
+            // every 6 bit read will be converted to encoding char
+            if (valueIndex == 6) {
+                base64Str[base64Index] = dictionary[value];
+                base64Index++;
+
+                // reset value
+                valueIndex = 0;
+                value = 0;
+            }
+        }
+        
+        msgIndex++;
     }
 
-    while (currLen < base64Len) {
-        // add padding
-        base64Str[currLen] = '=';
-        currLen++;
+    // add padding until final length is reached
+    while (base64Index < finalBase64Len) {
+        base64Str[base64Index] = '=';
+        base64Index++;
     }
 
-    base64Str[currLen] = '\0';
+    base64Str[base64Index] = '\0';
     strcpy(output, base64Str);
 }
 
 /*
-    Decodes base64 encoding to a UTF-8 string. Message is stored in output.
+    Decodes base64 encoding to a string. Message is stored in output.
 */
 void decode(char *encoding, char *output) {
     // four base64 characters are converted back to three bytes
@@ -95,10 +129,11 @@ void decode(char *encoding, char *output) {
     char msg[getBase64DecodeLen(encoding) + 1];
     int msgIndex = 0;
 
+    // temp value store for constructing msg char
     unsigned int value = 0;
     int valueIndex = 0;
 
-    while (encodingIndex <= encodingLen) {
+    while (encodingIndex < encodingLen) {
         if (encoding[encodingIndex] == '=') {
             encodingIndex++;
             value = value >> 2;
@@ -106,17 +141,18 @@ void decode(char *encoding, char *output) {
             continue;
         }
 
-        // Use table to translate base64 char to int
+        // Use table to translate base64 char to their actual value
         char search[] = {encoding[encodingIndex], '\0'};
-        int base64Value = getIndexFromStr(dictionary, search);     
+        int currEncodingCharVal = getIndexFromStr(dictionary, search);     
 
+        // each encoding char is 6 bits long
         for (int offset = 0; offset < 6; offset++) {
             value = value << 1;
-            value = ((base64Value >> (5 - offset)) & 1) | value;
+            value = ((currEncodingCharVal >> (5 - offset)) & 1) | value;
             valueIndex++;
-
+            
+            // every 8 bit read will be converted to msg char
             if (valueIndex == 8) {
-                // 1 letter converted, store in msg
                 msg[msgIndex] = (char) value;
                 msgIndex++;
 
@@ -135,15 +171,17 @@ void decode(char *encoding, char *output) {
 
 int main(int argc, char *arcv) {
     
-    // char msg[] = "Many hands make light work.";
-    // char encoding[getBase64EncodeLen(msg) + 1];
-    // encode(msg, encoding);
-    // printf("%s\n", encoding);
+    char msg[] = "Many hands make light work.";
+    char encoding[getBase64EncodeLen(msg) + 1];
+    encode(msg, encoding);
+    printf("%s\n", encoding);
 
-    char encoding[] = "TWFueSBoYW5kcyBtYWtlIGxpZ2h0IHdvcmsu";
-    char msg[getBase64DecodeLen(encoding) + 1];
-    decode(encoding, msg);
-    printf("%s\n", msg);
+    // char encoding[] = "TWFueSBoYW5kcyBtYWtlIGxpZ2h0IHdvcmsu";
+    // char msg[getBase64DecodeLen(encoding) + 1];
+    // decode(encoding, msg);
+    // printf("%s\n", msg);
+
+    //TODO: Base64 is usually to encode binary data like image not text, so do that.
 
     // char search[] = {'Q', '\0'};
     // int pos = getIndexFromStr(dictionary, search);
