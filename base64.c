@@ -18,7 +18,8 @@ struct Base64Ctx {
     // temp value store for constructing encoding char
     byte value;
     int valueIndex;
-    int inputByteCount;
+    int readCount;          // in bytes
+    int writeCount;         // in bytes
 
     // MAX_BUFFER_LEN chunk of the result is stored in resultBuf
     byte resultBuf[MAX_BUFFER_LEN];
@@ -34,7 +35,8 @@ struct Base64Ctx {
 void base64EncodeInit(struct Base64Ctx *ctx, char output[MAX_BUFFER_LEN], char *outputPath) {
     ctx->value = 0;
     ctx->valueIndex = 0;
-    ctx->inputByteCount = 0;
+    ctx->readCount = 0;
+    ctx->writeCount = 0;
 
     ctx->resultBufIndex = 0;
 
@@ -46,6 +48,7 @@ void base64EncodeInit(struct Base64Ctx *ctx, char output[MAX_BUFFER_LEN], char *
 void base64EncodeUpdate(struct Base64Ctx *ctx, byte *msg, int msgLen) {
     // each three bytes of msg are converted to four base64 encoding
     int msgIndex = 0;
+    ctx->readCount += msgLen;
 
     while (msgIndex < msgLen) {
         byte currMsgChar = msg[msgIndex];
@@ -74,6 +77,7 @@ void base64EncodeUpdate(struct Base64Ctx *ctx, byte *msg, int msgLen) {
             if (ctx->valueIndex == 6) {
                 ctx->resultBuf[ctx->resultBufIndex] = dictionary[ctx->value];
                 ctx->resultBufIndex++;
+                ctx->writeCount += 1;
 
                 // reset value
                 ctx->valueIndex = 0;
@@ -86,7 +90,7 @@ void base64EncodeUpdate(struct Base64Ctx *ctx, byte *msg, int msgLen) {
 }
 
 void base64EncodeFinal(struct Base64Ctx *ctx) {
-    // int inputBitCount = ctx->inputByteCount * 8;
+    // int inputBitCount = ctx->readCount * 8;
 
     // // no of base64 char needed to encode msg
     // int intialBase64Len = (inputBitCount + (6 - 1)) / 6;                      // always round up
@@ -94,6 +98,9 @@ void base64EncodeFinal(struct Base64Ctx *ctx) {
     // // base64 string length must be a multiple of 4
     // // since 3 bytes (24 bits) forms 4 base64 chars
     // int finalBase64Len = ((intialBase64Len + (4 - 1)) / 4) * 4;               // always round up
+
+    int finalBase64Len = (ctx->readCount + (3 - 1)) / 3;        // always round up
+    finalBase64Len = finalBase64Len * 4;
 
     if (ctx->value != 0) {
         int zeroPaddingSize = 6 - ctx->valueIndex;
@@ -116,14 +123,17 @@ void base64EncodeFinal(struct Base64Ctx *ctx) {
 
         ctx->resultBuf[ctx->resultBufIndex] = dictionary[ctx->value];
         ctx->resultBufIndex++;
+        ctx->writeCount += 1;
     }
 
     // add padding until final length is reached
-    // while (ctx->resultBufIndex < finalBase64Len) {
-    //     base64Str[base64Index] = '=';
-    //     base64Index++;
-    // }
+    while (ctx->writeCount < finalBase64Len) {
+        ctx->resultBuf[ctx->resultBufIndex] = '=';
+        ctx->resultBufIndex++;
+        ctx->writeCount += 1;
+    }
 
+    // write to output file and output buffer
     ctx->resultBuf[ctx->resultBufIndex] = '\0';
     if (ctx->exceedBuf == 0) {
         strcpy(ctx->outputBufP, ctx->resultBuf);
