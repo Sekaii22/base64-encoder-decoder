@@ -1,12 +1,140 @@
 #include <stdio.h>
 #include <string.h>
 
+#define LINE_LEN 1024
+#define MAX_BUFFER_LEN 5120
+#define OUTPUT_PATH "base64.txt"
+
+typedef unsigned char byte;
+
 /*
     BUILD COMMAND: gcc -fsanitize=address -o base64 base64.c
 */
 
 // base64 (standard) table
 char dictionary[64 + 1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+struct Base64Ctx {
+    // temp value store for constructing encoding char
+    byte value;
+    int valueIndex;
+    int inputByteCount;
+
+    // MAX_BUFFER_LEN chunk of the result is stored in resultBuf
+    byte resultBuf[MAX_BUFFER_LEN];
+    int resultBufIndex;
+
+    // write to resultBuf only to output file if exceed MAX_BUFFER_LEN,
+    // else write to both.
+    int exceedBuf;
+    char *outputBufP;
+    FILE *outputFileP;
+};
+
+void base64EncodeInit(struct Base64Ctx *ctx, char output[MAX_BUFFER_LEN], char *outputPath) {
+    ctx->value = 0;
+    ctx->valueIndex = 0;
+    ctx->inputByteCount = 0;
+
+    ctx->resultBufIndex = 0;
+
+    ctx->exceedBuf = 0;
+    ctx->outputBufP = output;
+    ctx->outputFileP = fopen(outputPath, "w");
+}
+
+void base64EncodeUpdate(struct Base64Ctx *ctx, byte *msg, int msgLen) {
+    // each three bytes of msg are converted to four base64 encoding
+    int msgIndex = 0;
+
+    while (msgIndex < msgLen) {
+        byte currMsgChar = msg[msgIndex];
+
+        // each msg char is 8 bits long
+        for (int offset = 0; offset < 8; offset++) {
+            // write buffer to output file if buffer max size is reached
+            if (ctx->resultBufIndex + 1 == MAX_BUFFER_LEN - 1) {
+                ctx->exceedBuf = 1;
+                ctx->resultBuf[ctx->resultBufIndex + 1] = '\0';
+                fputs(ctx->resultBuf, ctx->outputFileP);
+
+                // clears buffer
+                ctx->resultBuf[0] = '\0';
+                ctx->resultBufIndex = 0;
+            }
+
+            // add space
+            ctx->value = ctx->value << 1;
+
+            // read 1 bit from currMsgChar to value
+            ctx->value = ((currMsgChar >> (7 - offset)) & 1) | ctx->value;
+            ctx->valueIndex++;
+
+            // every 6 bit read will be converted to encoding char
+            if (ctx->valueIndex == 6) {
+                ctx->resultBuf[ctx->resultBufIndex] = dictionary[ctx->value];
+                ctx->resultBufIndex++;
+
+                // reset value
+                ctx->valueIndex = 0;
+                ctx->value = 0;
+            }
+        }
+        
+        msgIndex++;
+    }
+}
+
+void base64EncodeFinal(struct Base64Ctx *ctx) {
+    // int inputBitCount = ctx->inputByteCount * 8;
+
+    // // no of base64 char needed to encode msg
+    // int intialBase64Len = (inputBitCount + (6 - 1)) / 6;                      // always round up
+
+    // // base64 string length must be a multiple of 4
+    // // since 3 bytes (24 bits) forms 4 base64 chars
+    // int finalBase64Len = ((intialBase64Len + (4 - 1)) / 4) * 4;               // always round up
+
+    if (ctx->value != 0) {
+        int zeroPaddingSize = 6 - ctx->valueIndex;
+
+        // adds zero padding
+        for (int i = 0; i < zeroPaddingSize; i++) {
+            ctx->value = ctx->value << 1;
+        }
+
+        // write buffer to output file if buffer max size is reached
+        if (ctx->resultBufIndex + 1 == MAX_BUFFER_LEN - 1) {
+            ctx->exceedBuf = 1;
+            ctx->resultBuf[ctx->resultBufIndex + 1] = '\0';
+            fputs(ctx->resultBuf, ctx->outputFileP);
+
+            // clears buffer
+            ctx->resultBuf[0] = '\0';
+            ctx->resultBufIndex = 0;
+        }
+
+        ctx->resultBuf[ctx->resultBufIndex] = dictionary[ctx->value];
+        ctx->resultBufIndex++;
+    }
+
+    // add padding until final length is reached
+    // while (ctx->resultBufIndex < finalBase64Len) {
+    //     base64Str[base64Index] = '=';
+    //     base64Index++;
+    // }
+
+    ctx->resultBuf[ctx->resultBufIndex] = '\0';
+    if (ctx->exceedBuf == 0) {
+        strcpy(ctx->outputBufP, ctx->resultBuf);
+    } else {
+        printf("Encoding too large to print to console. Check output file for the encoding result.\n");
+    }
+    
+    fputs(ctx->resultBuf, ctx->outputFileP);
+    fclose(ctx->outputFileP);
+}
+
 
 /* 
     Calculate the base64 length after encoding the message. 
@@ -108,11 +236,7 @@ void encode(char *msg, char *output) {
         msgIndex++;
     }
 
-    // add padding until final length is reached
-    while (base64Index < finalBase64Len) {
-        base64Str[base64Index] = '=';
-        base64Index++;
-    }
+    
 
     base64Str[base64Index] = '\0';
     strcpy(output, base64Str);
@@ -169,23 +293,70 @@ void decode(char *encoding, char *output) {
     strcpy(output, msg);
 }
 
-int main(int argc, char *arcv) {
+int main(int argc, char *argv[]) {
     
-    char msg[] = "Many hands make light work.";
-    char encoding[getBase64EncodeLen(msg) + 1];
-    encode(msg, encoding);
-    printf("%s\n", encoding);
+    if (argc < 2) {
+        printf("No argument given.\n");
 
-    // char encoding[] = "TWFueSBoYW5kcyBtYWtlIGxpZ2h0IHdvcmsu";
-    // char msg[getBase64DecodeLen(encoding) + 1];
-    // decode(encoding, msg);
-    // printf("%s\n", msg);
+        // debug
+        // char msg[] = "a";
+        // char encoding[getBase64EncodeLen(msg) + 1];
+        // encode(msg, encoding);
+        // printf("%s\n", encoding);
+        
+        // char encoding[] = "TWFueSBoYW5kcyBtYWtlIGxpZ2h0IHdvcmsu";
+        // char msg[getBase64DecodeLen(encoding) + 1];
+        // decode(encoding, msg);
+        // printf("%s\n", msg);
+
+        struct Base64Ctx ctx;
+        byte msg[] = "a";
+        char output[MAX_BUFFER_LEN];
+
+        base64EncodeInit(&ctx, output, OUTPUT_PATH);
+
+        base64EncodeUpdate(&ctx, msg, sizeof(msg));
+
+        base64EncodeFinal(&ctx);
+
+        printf("output: %s\n", output);
+
+    } else {
+        //printf("%s\n", argv[1]);
+        FILE *fileP = fopen(argv[1], "rb");
+        if (fileP == NULL) {
+            printf("File failed to open.\n");
+            return 1;
+        }
+        byte fBuffer[LINE_LEN];
+
+        // FILE *outputP = fopen("base64.txt", "w");
+        // char fBuffer[LINE_LEN];
+        
+        // while(fgets(fBuffer, LINE_LEN - 1, fileP)) {
+        //     char encoding[getBase64EncodeLen(fBuffer) + 1];
+        //     encode(fBuffer, encoding);
+        //     fputs(encoding, outputP);
+        // }
+
+        struct Base64Ctx ctx;
+        char output[MAX_BUFFER_LEN];
+
+        base64EncodeInit(&ctx, output, OUTPUT_PATH);
+
+        int readLen = 0;
+        do {
+            readLen = fread(fBuffer, 1, sizeof(fBuffer), fileP);
+            base64EncodeUpdate(&ctx, fBuffer, readLen);
+        } while (readLen > 0);
+
+        base64EncodeFinal(&ctx);
+
+        printf("output: %s\n", output);
+    }
+
 
     //TODO: Base64 is usually to encode binary data like image not text, so do that.
-
-    // char search[] = {'Q', '\0'};
-    // int pos = getIndexFromStr(dictionary, search);
-    // printf("%d\n", pos);
 
     return 0;
 }
