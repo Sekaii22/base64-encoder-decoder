@@ -46,6 +46,9 @@ void base64Init(struct Base64Ctx *ctx, char output[MAX_BUFFER_LEN], char *output
     ctx->outputFileP = fopen(outputPath, "wb");
 }
 
+/* 
+    Encodes a message into a base64 string.
+*/
 void base64EncodeUpdate(struct Base64Ctx *ctx, byte *msg, int msgLen) {
     // each three bytes of msg are converted to four base64 encoding
     int msgIndex = 0;
@@ -142,30 +145,6 @@ void base64EncodeFinal(struct Base64Ctx *ctx) {
     fclose(ctx->outputFileP);
 }
 
-
-/* 
-    Calculate the base64 length after encoding the message. 
-*/
-int getBase64EncodeLen(char *msg) {
-    int msgBitLen = strlen(msg) * 8;
-
-    // no of base64 char needed to encode msg
-    int intialLen = (msgBitLen + (6 - 1)) / 6;                    // always round up
-
-    // base64 string length must be a multiple of 4
-    // since 3 bytes (24 bits) forms 4 base64 chars
-    int finalLen = ((intialLen + (4 - 1)) / 4) * 4;               // always round up
-
-    return finalLen;
-}
-
-/*
-    Calculate the message length after decoding the base64 encoding.
-*/
-int getBase64DecodeLen(char *encoding) {
-    return (strlen(encoding) * 6) / 8; 
-}
-
 /*
     Get starting index of the first occurance of subStr in str.
 */
@@ -176,79 +155,9 @@ int getIndexFromStr(char *str, char *subStr) {
     return pos;
 }
 
-/* 
-    Encodes a message into a base64 string. Base64 string is stored in output.
+/*
+    Decodes base64 encoding back to binary.
 */
-void encode(char *msg, char *output) {
-    // each three bytes of msg are converted to four base64 encoding
-    int msgLen = strlen(msg);
-    int msgIndex = 0;
-    
-    int finalBase64Len = getBase64EncodeLen(msg);
-    char base64Str[finalBase64Len + 1];
-    int base64Index = 0;
-
-    /*
-    //constructing the base64 string
-    while (bitIndex < msgBitLen) {
-        unsigned int value = 0;
-
-        // capture chunk of 6 bits to construct a base64 char
-        for (int i = 0; i < 6; i++) {
-            int byteIndex = bitIndex / 8;
-            int bitOffset = bitIndex % 8;
-
-            // shift left, adds space to append
-            value = value << 1;
-
-            if (bitIndex < msgBitLen) {
-                // read starting from most significant unread bit (leftmost bit),
-                // shift right and get just that 1 bit using & 1
-                // append that bit to value using | (or)
-                value = ((msg[byteIndex] >> (7 - bitOffset)) & 1) | value;
-                bitIndex++;
-            }
-        }
-
-        // add the base64 char to final string
-        base64Str[base64Index] = dictionary[value];
-        base64Index++;
-    }
-    */
-
-    // temp value store for constructing encoding char
-    unsigned int value = 0;
-    int valueIndex = 0;
-
-    while (msgIndex < msgLen) {
-        unsigned char currMsgChar = msg[msgIndex];
-
-        // each msg char is 8 bits long
-        for (int offset = 0; offset < 8; offset++) {
-            value = value << 1;
-            value = ((currMsgChar >> (7 - offset)) & 1) | value;
-            valueIndex++;
-
-            // every 6 bit read will be converted to encoding char
-            if (valueIndex == 6) {
-                base64Str[base64Index] = dictionary[value];
-                base64Index++;
-
-                // reset value
-                valueIndex = 0;
-                value = 0;
-            }
-        }
-        
-        msgIndex++;
-    }
-
-    
-
-    base64Str[base64Index] = '\0';
-    strcpy(output, base64Str);
-}
-
 void base64DecodeUpdate(struct Base64Ctx *ctx, char *encoding, int encodingLen) {
     int encodingIndex = 0;
 
@@ -316,73 +225,12 @@ void base64DecodeFinal(struct Base64Ctx *ctx) {
     fclose(ctx->outputFileP);
 }
 
-/*
-    Decodes base64 encoding to a string. Message is stored in output.
-*/
-void decode(char *encoding, char *output) {
-    // four base64 characters are converted back to three bytes
-    int encodingLen = strlen(encoding);
-    int encodingIndex = 0;
-
-    char msg[getBase64DecodeLen(encoding) + 1];
-    int msgIndex = 0;
-
-    // temp value store for constructing msg char
-    unsigned int value = 0;
-    int valueIndex = 0;
-
-    while (encodingIndex < encodingLen) {
-        if (encoding[encodingIndex] == '=') {
-            encodingIndex++;
-            value = value >> 2;
-            valueIndex = valueIndex - 2 >= 0 ? valueIndex - 2 : 0;
-            continue;
-        }
-
-        // Use table to translate base64 char to their actual value
-        char search[] = {encoding[encodingIndex], '\0'};
-        int currEncodingCharVal = getIndexFromStr(dictionary, search);     
-
-        // each encoding char is 6 bits long
-        for (int offset = 0; offset < 6; offset++) {
-            value = value << 1;
-            value = ((currEncodingCharVal >> (5 - offset)) & 1) | value;
-            valueIndex++;
-            
-            // every 8 bit read will be converted to msg char
-            if (valueIndex == 8) {
-                msg[msgIndex] = (char) value;
-                msgIndex++;
-
-                // reset value
-                valueIndex = 0;
-                value = 0;
-            }
-        }
-
-        encodingIndex++;
-    }
-
-    msg[msgIndex] = '\0';
-    strcpy(output, msg);
-}
-
 int main(int argc, char *argv[]) {
     
     if (argc < 2) {
         printf("No argument given.\n");
 
         // debug
-        // char msg[] = "a";
-        // char encoding[getBase64EncodeLen(msg) + 1];
-        // encode(msg, encoding);
-        // printf("%s\n", encoding);
-        
-        // char encoding[] = "TWFueSBoYW5kcyBtYWtlIGxpZ2h0IHdvcmsu";
-        // char msg[getBase64DecodeLen(encoding) + 1];
-        // decode(encoding, msg);
-        // printf("%s\n", msg);
-
         struct Base64Ctx ctx;
         byte msg[] = "a";
         char encoding[] = "TWFueSBoYW5kcyBtYWtlIGxpZ2h0IHdvcmsu";
@@ -401,28 +249,23 @@ int main(int argc, char *argv[]) {
 
     } else {
         //printf("%s\n", argv[1]);
+
+        // read file
         FILE *fileP = fopen(argv[1], "rb");
         if (fileP == NULL) {
             printf("File failed to open.\n");
             return 1;
         }
-        byte fBuffer[LINE_LEN];
-
-        // FILE *outputP = fopen("base64.txt", "w");
-        // char fBuffer[LINE_LEN];
         
-        // while(fgets(fBuffer, LINE_LEN - 1, fileP)) {
-        //     char encoding[getBase64EncodeLen(fBuffer) + 1];
-        //     encode(fBuffer, encoding);
-        //     fputs(encoding, outputP);
-        // }
-
+        byte fBuffer[LINE_LEN];
         struct Base64Ctx ctx;
         char output[MAX_BUFFER_LEN];
 
+        // initialize base64 context
         base64Init(&ctx, output, OUTPUT_PATH);
 
-        // encoding
+        // encoding operation
+        // printf("Encoding...\n");
         // int readLen = 0;
         // do {
         //     // reading binary file
@@ -432,8 +275,9 @@ int main(int argc, char *argv[]) {
         
         // base64EncodeFinal(&ctx);
         
-        // decoding
+        // decoding operation
         // reading text file
+        printf("Decoding...\n");
         while(fgets(fBuffer, LINE_LEN-1, fileP)) {
             base64DecodeUpdate(&ctx, fBuffer, strlen(fBuffer));
         }
