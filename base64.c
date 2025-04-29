@@ -319,19 +319,24 @@ void printHelp() {
     printf("*                                      *\n");
     printf("****************************************\n");
     printf("\n");
-    printf("./base64 [-e|-d] [-b filepath]|[text]\n");
+    printf("./base64 [-e|-d]  [-b FILEPATH]|[TEXT]\n");
     printf("   Encoder transform binary data to a sequence of printable 64 unique characters.\n");
-    printf("   Decoder transform Base64 encoding back into binary data. Only able to decode Base64 with padding.\n");
+    printf("   Decoder transform Base64 encoding back into binary data.\n");
+    printf("   Example (Encoding): ./base64 -e -b example/image01.jpg\n");
+    printf("   Example (Decoding): ./base64 -o=decode.jpg -d -b encoding.txt\n");
     printf("\n");
     printf("   Options:\n");
-    printf("    -h, --help\t  Prints help information.\n");
-    printf("    -e, --encode\t  Performs encoding operation.\n");
-    printf("    -d, --decode\t  Performs decoding operation.\n");
-    printf("    -b, --binary\t  Set binary mode. Final argument should be a file path.\n");
+    printf("    -h, --help\t\t\t  Prints help information.\n");
+    printf("    -e, --encode\t\t  Performs encoding operation.\n");
+    printf("    -d, --decode\t\t  Performs decoding operation.\n");
+    printf("    -o, --output-file=FILEPATH\t  Set output file path.\n");
+    printf("    -b, --binary\t\t  Set binary mode. Last argument given should be a path\n");
+    printf("                \t\t  to the file that you want to perform operation on.\n");
     printf("\n");
     printf("Result will always be automatically written to an output file.\n");
-    printf("If -b, --binary option is set, the file binary content at filepath will be encoded\n");
-    printf("Otherwise, if -b, --binary option is not set, then the given text will be encoded and the result will be printed if buffer is not exceeded.\n");
+    printf("If -b, --binary option is set, the file binary content at FILEPATH will be encoded.\n");
+    printf("Otherwise, if -b, --binary option is not set, then the TEXT will be encoded and the\n");
+    printf("result will be printed if buffer is not exceeded.\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -357,21 +362,13 @@ int main(int argc, char *argv[]) {
         }
     }
     else {
-        /*
-        ./base64 [-e|-d] [-b FILEPATH]|[text]
-            -h, --help
-            -e, --encode
-            -d, --decode
-            -b, --binary [FILEPATH]
-            -o, --output-file=FILEPATH
-        */
-
+        // more than 1 argument
         int helpFlag = 0;
         int encodeFlag = 0;
         int decodeFlag = 0;
         int binaryFlag = 0;
         char *outputPath = NULL;
-        char *subject = argv[argc - 1];     // text or filepath
+        char *subject = argv[argc - 1];             // text or filepath depending on binaryFlag
        
         // check if all options given are valid
         for (int i = 1; i < argc - 1; i++) {
@@ -485,6 +482,6 @@ int main(int argc, char *argv[]) {
 
     // TODO: if no printable chars found during decoding such as when
     // 1 base64 char (6 bits) is not able to be fully decoded into 1 byte.
-    // TODO: Add -o, --output-file=... option to set output file path.
+    // TODO: Increase output buffer size.
     return 0;
 }
