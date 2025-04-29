@@ -7,6 +7,9 @@
 #define DECODE_OUTPUT_PATH "decoding.txt"
 #define MAX_FILE_PATH 256
 
+#define RED "\033[1;31m"
+#define RESET "\033[0m"
+
 typedef unsigned char byte;
 
 /*
@@ -309,6 +312,28 @@ void decode(FILE *fileP, char *msg) {
     }
 }
 
+void printHelp() {
+    printf("****************************************\n");
+    printf("*                                      *\n");
+    printf("*        Base64 Encoder Decoder        *\n");
+    printf("*                                      *\n");
+    printf("****************************************\n");
+    printf("\n");
+    printf("./base64 [-e|-d] [-b filepath]|[text]\n");
+    printf("   Encoder transform binary data to a sequence of printable 64 unique characters.\n");
+    printf("   Decoder transform Base64 encoding back into binary data. Only able to decode Base64 with padding.\n");
+    printf("\n");
+    printf("   Options:\n");
+    printf("    -h, --help\t  Prints help information.\n");
+    printf("    -e, --encode\t  Performs encoding operation.\n");
+    printf("    -d, --decode\t  Performs decoding operation.\n");
+    printf("    -b, --binary\t  Set binary mode. Final argument should be a file path.\n");
+    printf("\n");
+    printf("Result will always be automatically written to an output file.\n");
+    printf("If -b, --binary option is set, the file binary content at filepath will be encoded\n");
+    printf("Otherwise, if -b, --binary option is not set, then the given text will be encoded and the result will be printed if buffer is not exceeded.\n");
+}
+
 int main(int argc, char *argv[]) {
     
     if (argc < 2) {
@@ -322,10 +347,7 @@ int main(int argc, char *argv[]) {
             -d, --decode
             -b, --binary [filepath]
 
-            If -b, --binary option is chosen, the given filepath will be encoded 
-            and the output will be automatically written to an output file.
-            Otherwise, the given text will be encoded and result is printed. 
-            If result exceeds buffer length, it will be written to an output file. 
+            
         */
 
         int helpFlag = 0;
@@ -333,6 +355,7 @@ int main(int argc, char *argv[]) {
         int decodeFlag = 0;
         int binaryFlag = 0;
         char *subject = argv[argc - 1];     // text or filepath
+
        
         // check if all options given are valid
         for (int i = 1; i < argc; i++) {
@@ -349,26 +372,32 @@ int main(int argc, char *argv[]) {
                 binaryFlag = 1;
             }
             else if (i != argc - 1) {
+                printf(RED);
                 printf("Unrecognized command-line option %s. Use -h or --help for more information.\n", argv[i]);
+                printf(RESET);
                 return 0;
             }
         }
         
         // check for help flag
         if (helpFlag) {
-            printf("Help message not implemented yet.\n");
+            printHelp();
             return 0;
         }
 
         // check for decode or encode flag
         if (encodeFlag && decodeFlag) {
+            printf(RED);
             printf("Both operation flag detected, only one can be active at a time.\n");
             printf("Unable to proceed. Try again.\n");
+            printf(RESET);
             return 0;
         } 
         else if (!encodeFlag && !decodeFlag) {
+            printf(RED);
             printf("No operation flag detected.\n");
             printf("Unable to proceed. Try again.\n");
+            printf(RESET);
             return 0;
         }
 
@@ -378,7 +407,9 @@ int main(int argc, char *argv[]) {
                 // read file
                 FILE *fileP = fopen(subject, "rb");
                 if (fileP == NULL) {
+                    printf(RED);
                     printf("File failed to open.\n");
+                    printf(RESET);
                     return 1;
                 }
 
@@ -399,7 +430,9 @@ int main(int argc, char *argv[]) {
                 // read file
                 FILE *fileP = fopen(subject, "rb");
                 if (fileP == NULL) {
+                    printf(RED);
                     printf("File failed to open.\n");
+                    printf(RESET);
                     return 1;
                 }
 
@@ -417,5 +450,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // TODO: if no printable chars found during decoding such as when
+    // 1 base64 char (6 bits) is not able to be fully decoded into 1 byte.
+    // TODO: Add -o, --output-file=... option to set output file path.
     return 0;
 }
