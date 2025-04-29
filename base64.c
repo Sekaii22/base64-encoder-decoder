@@ -72,7 +72,7 @@ void base64EncodeUpdate(struct Base64Ctx *ctx, byte *msg, int msgLen) {
             // add space
             ctx->value = ctx->value << 1;
 
-            // read 1 bit from currMsgChar to value
+            // read 1 bit from currMsgChar and append to value
             ctx->value = ((currMsgChar >> (7 - offset)) & 1) | ctx->value;
             ctx->valueIndex++;
 
@@ -348,7 +348,7 @@ void printHelp() {
     printf("*                                      *\n");
     printf("****************************************\n");
     printf("\n");
-    printf("./base64 [-e|-d]  [-b FILEPATH]|[TEXT]\n");
+    printf("./base64 [-e|-d] [-o=OUTPUTPATH] [-b FILEPATH]|[TEXT]\n");
     printf("   Encoder transform binary data to a sequence of printable 64 unique characters.\n");
     printf("   Decoder transform Base64 encoding back into binary data.\n");
     printf("   Example (Encoding): ./base64 -e -b example/image01.jpg\n");
@@ -358,7 +358,7 @@ void printHelp() {
     printf("    -h, --help\t\t\t  Prints help information.\n");
     printf("    -e, --encode\t\t  Performs encoding operation.\n");
     printf("    -d, --decode\t\t  Performs decoding operation.\n");
-    printf("    -o, --output-file=FILEPATH\t  Set output file path.\n");
+    printf("    -o, --output-file=OUTPUTPATH  Set output file path.\n");
     printf("    -b, --binary\t\t  Set binary mode to perform operation on file. Last argument\n");
     printf("                \t\t  given should be a path to the file that you want to perform\n");
     printf("                \t\t  operation on.\n");
