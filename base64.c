@@ -235,6 +235,80 @@ void base64DecodeFinal(struct Base64Ctx *ctx) {
     fclose(ctx->outputFileP);
 }
 
+void encode(FILE *fileP, char *msg) {
+    if (fileP != NULL) {
+        byte fBuffer[LINE_LEN];
+        struct Base64Ctx ctx;
+        char output[MAX_BUFFER_LEN];
+
+        // initialize base64 context
+        base64Init(&ctx, output, ENCODE_OUTPUT_PATH);
+        
+        int readLen = 0;
+        do {
+            // reading binary file
+            readLen = fread(fBuffer, 1, sizeof(fBuffer), fileP);
+            base64EncodeUpdate(&ctx, fBuffer, readLen);
+        } while (readLen > 0);
+        
+        base64EncodeFinal(&ctx);
+    } 
+    else if (msg != NULL) {
+        struct Base64Ctx ctx;
+        char output[MAX_BUFFER_LEN];
+        
+        // initialize base64 context
+        base64Init(&ctx, output, ENCODE_OUTPUT_PATH);
+
+        base64EncodeUpdate(&ctx, msg, strlen(msg));
+        
+        base64EncodeFinal(&ctx);
+
+        if (ctx.exceedBuf == 0) {
+            printf("%s\n", output);
+        }
+        else {
+            printf("Encoding result too large to print to console. Check output file for the result.\n");
+        }
+    }
+}
+
+void decode(FILE *fileP, char *msg) {
+    if (fileP != NULL) { 
+        byte fBuffer[LINE_LEN];
+        struct Base64Ctx ctx;
+        char output[MAX_BUFFER_LEN];
+        
+        // initialize base64 context
+        base64Init(&ctx, output, DECODE_OUTPUT_PATH);
+        
+        // reading text file
+        while(fgets(fBuffer, LINE_LEN-1, fileP)) {
+            base64DecodeUpdate(&ctx, fBuffer, strlen(fBuffer));
+        }
+    
+        base64DecodeFinal(&ctx);
+    }
+    else if (msg != NULL) {
+        struct Base64Ctx ctx;
+        char output[MAX_BUFFER_LEN];
+
+        // initialize base64 context
+        base64Init(&ctx, output, DECODE_OUTPUT_PATH);
+
+        base64DecodeUpdate(&ctx, msg, strlen(msg));
+    
+        base64DecodeFinal(&ctx);
+        
+        if (ctx.exceedBuf == 0) {
+            printf("%s\n", output);
+        }
+        else {
+            printf("Decoding result too large to print to console. Check output file for the result.\n");
+        }
+    }
+}
+
 int main(int argc, char *argv[]) {
     
     if (argc < 2) {
@@ -242,7 +316,7 @@ int main(int argc, char *argv[]) {
 
     } else {
         /*
-        ./base64 [-e|-d] [-o filepath] [-b filepath]|[text]
+        ./base64 [-e|-d] [-b filepath]|[text]
             -h, --help
             -e, --encode
             -d, --decode
@@ -298,77 +372,49 @@ int main(int argc, char *argv[]) {
             return 0;
         }
 
-
         // do operation
         if (encodeFlag) {
-            // read file
-            FILE *fileP = fopen(subject, "rb");
-            if (fileP == NULL) {
-                printf("File failed to open.\n");
-                return 1;
-            }
+            if (binaryFlag) {
+                // read file
+                FILE *fileP = fopen(subject, "rb");
+                if (fileP == NULL) {
+                    printf("File failed to open.\n");
+                    return 1;
+                }
 
-            byte fBuffer[LINE_LEN];
-            struct Base64Ctx ctx;
-            char output[MAX_BUFFER_LEN];
-            
-            // initialize base64 context
-            base64Init(&ctx, output, ENCODE_OUTPUT_PATH);
-            
-            // encoding operation
-            printf("Encoding...\n");
-            int readLen = 0;
-            do {
-                // reading binary file
-                readLen = fread(fBuffer, 1, sizeof(fBuffer), fileP);
-                base64EncodeUpdate(&ctx, fBuffer, readLen);
-            } while (readLen > 0);
-            
-            base64EncodeFinal(&ctx);
-            
-            // only if -b, --binary flag is not set
-            if (ctx.exceedBuf == 0) {
-                printf("%s\n", output);
+                // encoding operation
+                printf("Encoding...\n");
+                encode(fileP, NULL);
+                printf("Encoding completed.\n");
             }
             else {
-                printf("Encoding result too large to print to console. Check output file for the result.\n");
+                // encoding operation
+                printf("Encoding...\n");
+                encode(NULL, subject);
+                printf("Encoding completed.\n");
             }
         }
-
         else if (decodeFlag) {
-            // read file
-            FILE *fileP = fopen(subject, "rb");
-            if (fileP == NULL) {
-                printf("File failed to open.\n");
-                return 1;
-            }
+            if (binaryFlag) {
+                // read file
+                FILE *fileP = fopen(subject, "rb");
+                if (fileP == NULL) {
+                    printf("File failed to open.\n");
+                    return 1;
+                }
 
-            byte fBuffer[LINE_LEN];
-            struct Base64Ctx ctx;
-            char output[MAX_BUFFER_LEN];
-            
-            // initialize base64 context
-            base64Init(&ctx, output, DECODE_OUTPUT_PATH);
-            
-            // decoding operation
-            // reading text file
-            printf("Decoding...\n");
-            while(fgets(fBuffer, LINE_LEN-1, fileP)) {
-                base64DecodeUpdate(&ctx, fBuffer, strlen(fBuffer));
-            }
-    
-            base64DecodeFinal(&ctx);
-
-            // only if -b, --binary flag is not set
-            if (ctx.exceedBuf == 0) {
-                printf("%s\n", output);
+                // decoding operation
+                printf("Decoding...\n");
+                decode(fileP, NULL);
+                printf("Decoding completed.\n");
             }
             else {
-                printf("Decoding result too large to print to console. Check output file for the result.\n");
+                // decoding operation
+                printf("Decoding...\n");
+                decode(NULL, subject);
+                printf("Decoding completed.\n");
             }
         }
-
-        
     }
 
     return 0;
