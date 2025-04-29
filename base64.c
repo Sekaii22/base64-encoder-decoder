@@ -104,7 +104,7 @@ void base64EncodeFinal(struct Base64Ctx *ctx) {
     int finalBase64Len = (ctx->readCount + (3 - 1)) / 3;        // always round up
     finalBase64Len = finalBase64Len * 4;
 
-    if (ctx->value != 0) {
+    if (ctx->valueIndex != 0) {
         int zeroPaddingSize = 6 - ctx->valueIndex;
 
         // adds zero padding
