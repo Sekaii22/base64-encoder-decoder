@@ -238,14 +238,14 @@ void base64DecodeFinal(struct Base64Ctx *ctx) {
     fclose(ctx->outputFileP);
 }
 
-void encode(FILE *fileP, char *msg) {
+void encode(FILE *fileP, char *msg, char *outputPath) {
     if (fileP != NULL) {
         byte fBuffer[LINE_LEN];
         struct Base64Ctx ctx;
         char output[MAX_BUFFER_LEN];
 
         // initialize base64 context
-        base64Init(&ctx, output, ENCODE_OUTPUT_PATH);
+        base64Init(&ctx, output, outputPath);
         
         int readLen = 0;
         do {
@@ -261,7 +261,7 @@ void encode(FILE *fileP, char *msg) {
         char output[MAX_BUFFER_LEN];
         
         // initialize base64 context
-        base64Init(&ctx, output, ENCODE_OUTPUT_PATH);
+        base64Init(&ctx, output, outputPath);
 
         base64EncodeUpdate(&ctx, msg, strlen(msg));
         
@@ -276,14 +276,14 @@ void encode(FILE *fileP, char *msg) {
     }
 }
 
-void decode(FILE *fileP, char *msg) {
+void decode(FILE *fileP, char *msg, char *outputPath) {
     if (fileP != NULL) { 
         byte fBuffer[LINE_LEN];
         struct Base64Ctx ctx;
         char output[MAX_BUFFER_LEN];
         
         // initialize base64 context
-        base64Init(&ctx, output, DECODE_OUTPUT_PATH);
+        base64Init(&ctx, output, outputPath);
         
         // reading text file
         while(fgets(fBuffer, LINE_LEN-1, fileP)) {
@@ -297,7 +297,7 @@ void decode(FILE *fileP, char *msg) {
         char output[MAX_BUFFER_LEN];
 
         // initialize base64 context
-        base64Init(&ctx, output, DECODE_OUTPUT_PATH);
+        base64Init(&ctx, output, outputPath);
 
         base64DecodeUpdate(&ctx, msg, strlen(msg));
     
@@ -339,26 +339,42 @@ int main(int argc, char *argv[]) {
     if (argc < 2) {
         printf("No argument given. Use -h or --help for more information.\n");
 
-    } else {
+    } 
+    else if (argc == 2) {
+        // if only 1 argument is given
+        if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
+            printHelp();
+        }
+        else if (!(strcmp(argv[1], "-e") == 0 || strcmp(argv[1], "--encode") == 0) &&
+                !(strcmp(argv[1], "-d") == 0 || strcmp(argv[1], "--decode") == 0) && 
+                !(strcmp(argv[1], "-b") == 0 || strcmp(argv[1], "--binary") == 0) && 
+                !(strstr(argv[1], "-o=") != NULL || strstr(argv[1], "--output-file=") != NULL)) {
+            
+            printf(RED);
+            printf("Unrecognized command-line option %s. Use -h or --help for more information.\n", argv[1]);
+            printf(RESET);
+            return 0;
+        }
+    }
+    else {
         /*
-        ./base64 [-e|-d] [-b filepath]|[text]
+        ./base64 [-e|-d] [-b FILEPATH]|[text]
             -h, --help
             -e, --encode
             -d, --decode
-            -b, --binary [filepath]
-
-            
+            -b, --binary [FILEPATH]
+            -o, --output-file=FILEPATH
         */
 
         int helpFlag = 0;
         int encodeFlag = 0;
         int decodeFlag = 0;
         int binaryFlag = 0;
+        char *outputPath = NULL;
         char *subject = argv[argc - 1];     // text or filepath
-
        
         // check if all options given are valid
-        for (int i = 1; i < argc; i++) {
+        for (int i = 1; i < argc - 1; i++) {
             if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
                 helpFlag = 1;
             }
@@ -371,7 +387,18 @@ int main(int argc, char *argv[]) {
             else if (strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--binary") == 0) {
                 binaryFlag = 1;
             }
-            else if (i != argc - 1) {
+            else if (strstr(argv[i], "-o=") != NULL || strstr(argv[i], "--output-file=") != NULL) {
+                // extract file path using = delimiter
+                strtok(argv[i], "=");
+                outputPath = strtok(NULL, "=");
+
+                if (outputPath == NULL) {
+                    printf(RED);
+                    printf("Output file path is undefined. Default output path will be used.\n");
+                    printf(RESET);
+                }
+            }
+            else {
                 printf(RED);
                 printf("Unrecognized command-line option %s. Use -h or --help for more information.\n", argv[i]);
                 printf(RESET);
@@ -400,9 +427,12 @@ int main(int argc, char *argv[]) {
             printf(RESET);
             return 0;
         }
-
+        
         // do operation
-        if (encodeFlag) {
+        if (encodeFlag) {            
+            // set output path
+            outputPath = (outputPath == NULL) ? ENCODE_OUTPUT_PATH : outputPath;
+
             if (binaryFlag) {
                 // read file
                 FILE *fileP = fopen(subject, "rb");
@@ -415,17 +445,20 @@ int main(int argc, char *argv[]) {
 
                 // encoding operation
                 printf("Encoding...\n");
-                encode(fileP, NULL);
+                encode(fileP, NULL, outputPath);
                 printf("Encoding completed.\n");
             }
             else {
                 // encoding operation
                 printf("Encoding...\n");
-                encode(NULL, subject);
+                encode(NULL, subject, outputPath);
                 printf("Encoding completed.\n");
             }
         }
         else if (decodeFlag) {
+            // set output path
+            outputPath = (outputPath == NULL) ? DECODE_OUTPUT_PATH : outputPath;
+
             if (binaryFlag) {
                 // read file
                 FILE *fileP = fopen(subject, "rb");
@@ -438,13 +471,13 @@ int main(int argc, char *argv[]) {
 
                 // decoding operation
                 printf("Decoding...\n");
-                decode(fileP, NULL);
+                decode(fileP, NULL, outputPath);
                 printf("Decoding completed.\n");
             }
             else {
                 // decoding operation
                 printf("Decoding...\n");
-                decode(NULL, subject);
+                decode(NULL, subject, outputPath);
                 printf("Decoding completed.\n");
             }
         }
