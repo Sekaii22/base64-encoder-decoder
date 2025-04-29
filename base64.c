@@ -38,6 +38,9 @@ struct Base64Ctx {
     FILE *outputFileP;
 };
 
+/*
+    Initialize Base64 context for encoding or decoding operation.
+*/
 void base64Init(struct Base64Ctx *ctx, char output[MAX_BUFFER_LEN], char *outputPath) {
     ctx->value = 0;
     ctx->valueIndex = 0;
@@ -53,7 +56,7 @@ void base64Init(struct Base64Ctx *ctx, char output[MAX_BUFFER_LEN], char *output
 }
 
 /* 
-    Encodes a message into a base64 string.
+    Performs the encoding operation on msg and update Base64 context.
 */
 void base64EncodeUpdate(struct Base64Ctx *ctx, byte *msg, int msgLen) {
     // each three bytes of msg are converted to four base64 encoding
@@ -79,8 +82,6 @@ void base64EncodeUpdate(struct Base64Ctx *ctx, byte *msg, int msgLen) {
                 // write buffer to output file if buffer max size is reached
                 if (ctx->resultBufIndex == MAX_BUFFER_LEN) {
                     ctx->exceedBuf = 1;
-                    // ctx->resultBuf[ctx->resultBufIndex + 1] = '\0';
-                    // fputs(ctx->resultBuf, ctx->outputFileP);
                     // don't have to care about adding a '\0' since fwrite can just specify bytes to write
                     fwrite(ctx->resultBuf, 1, ctx->resultBufIndex, ctx->outputFileP);
 
@@ -103,6 +104,9 @@ void base64EncodeUpdate(struct Base64Ctx *ctx, byte *msg, int msgLen) {
     }
 }
 
+/* 
+    Finalize encoding operation. Adds padding if needed and closes output file.
+*/
 void base64EncodeFinal(struct Base64Ctx *ctx) {
     int finalBase64Len = (ctx->readCount + (3 - 1)) / 3;        // always round up
     finalBase64Len = finalBase64Len * 4;
@@ -130,7 +134,7 @@ void base64EncodeFinal(struct Base64Ctx *ctx) {
         ctx->writeCount += 1;
     }
 
-    // add padding until final length is reached
+    // add = padding until final length is reached
     while (ctx->writeCount < finalBase64Len) {
         // write buffer to output file if buffer max size is reached
         if (ctx->resultBufIndex == MAX_BUFFER_LEN) {
@@ -170,9 +174,10 @@ int getIndexFromStr(char *str, char *subStr) {
 }
 
 /*
-    Decodes base64 encoding back to binary.
+    Performs the decoding operation on encoding and update Base64 context.
 */
 void base64DecodeUpdate(struct Base64Ctx *ctx, char *encoding, int encodingLen) {
+    // every four base64 encoding char are converted to three bytes
     int encodingIndex = 0;
 
     while (encodingIndex < encodingLen) {
@@ -225,6 +230,9 @@ void base64DecodeUpdate(struct Base64Ctx *ctx, char *encoding, int encodingLen) 
     }
 }
 
+/* 
+    Finalize decoding operation. Closes output file.
+*/
 void base64DecodeFinal(struct Base64Ctx *ctx) {
     // write everything left in buffer to file as binary using fwrite
     fwrite(ctx->resultBuf, 1, ctx->resultBufIndex, ctx->outputFileP);
@@ -238,7 +246,12 @@ void base64DecodeFinal(struct Base64Ctx *ctx) {
     fclose(ctx->outputFileP);
 }
 
+/* 
+    Calls initialization, encoding updates, and finialization 
+    depending on binary or text encoding option.
+*/
 void encode(FILE *fileP, char *msg, char *outputPath) {
+    // encode binary from file
     if (fileP != NULL) {
         byte fBuffer[LINE_LEN];
         struct Base64Ctx ctx;
@@ -256,6 +269,7 @@ void encode(FILE *fileP, char *msg, char *outputPath) {
         
         base64EncodeFinal(&ctx);
     } 
+    // encode string message
     else if (msg != NULL) {
         struct Base64Ctx ctx;
         char output[MAX_BUFFER_LEN];
@@ -263,8 +277,10 @@ void encode(FILE *fileP, char *msg, char *outputPath) {
         // initialize base64 context
         base64Init(&ctx, output, outputPath);
 
+        // performs encoding operation
         base64EncodeUpdate(&ctx, msg, strlen(msg));
         
+        // finialize encoding operation
         base64EncodeFinal(&ctx);
 
         if (ctx.exceedBuf == 0) {
@@ -276,7 +292,12 @@ void encode(FILE *fileP, char *msg, char *outputPath) {
     }
 }
 
+/* 
+    Calls initialization, decoding updates, and finialization 
+    depending on binary or text encoding option.
+*/
 void decode(FILE *fileP, char *msg, char *outputPath) {
+    // decode base64 encoding from file
     if (fileP != NULL) { 
         byte fBuffer[LINE_LEN];
         struct Base64Ctx ctx;
@@ -292,6 +313,7 @@ void decode(FILE *fileP, char *msg, char *outputPath) {
     
         base64DecodeFinal(&ctx);
     }
+    //decode base64 string message
     else if (msg != NULL) {
         struct Base64Ctx ctx;
         char output[MAX_BUFFER_LEN];
@@ -299,12 +321,19 @@ void decode(FILE *fileP, char *msg, char *outputPath) {
         // initialize base64 context
         base64Init(&ctx, output, outputPath);
 
+        // performs decoding operation
         base64DecodeUpdate(&ctx, msg, strlen(msg));
     
+        // finialize decoding operation
         base64DecodeFinal(&ctx);
         
         if (ctx.exceedBuf == 0) {
-            printf("%s\n", output);
+            if (strlen(output) == 0) {
+                printf("No printable characters found, check output file.\n");
+            }
+            else {
+                printf("%s\n", output);
+            }
         }
         else {
             printf("Decoding result too large to print to console. Check output file for the result.\n");
@@ -330,8 +359,9 @@ void printHelp() {
     printf("    -e, --encode\t\t  Performs encoding operation.\n");
     printf("    -d, --decode\t\t  Performs decoding operation.\n");
     printf("    -o, --output-file=FILEPATH\t  Set output file path.\n");
-    printf("    -b, --binary\t\t  Set binary mode. Last argument given should be a path\n");
-    printf("                \t\t  to the file that you want to perform operation on.\n");
+    printf("    -b, --binary\t\t  Set binary mode to perform operation on file. Last argument\n");
+    printf("                \t\t  given should be a path to the file that you want to perform\n");
+    printf("                \t\t  operation on.\n");
     printf("\n");
     printf("Result will always be automatically written to an output file.\n");
     printf("If -b, --binary option is set, the file binary content at FILEPATH will be encoded.\n");
@@ -480,8 +510,5 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // TODO: if no printable chars found during decoding such as when
-    // 1 base64 char (6 bits) is not able to be fully decoded into 1 byte.
-    // TODO: Increase output buffer size.
     return 0;
 }
