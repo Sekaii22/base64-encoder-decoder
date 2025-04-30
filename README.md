@@ -1,6 +1,5 @@
 # base64-encoder-decoder
-Base64 encoder transform binary data to a sequence of printable 64 unique characters, each 6 bits each. The decoder transforms the Base64 encoding back into binary data.
-Logs are automatically generated for debugging.
+Base64 encoder transform binary data to a sequence of printable characters, limited to a set of 64 unique characters. The source binary data is taken 6 bits at a time, then this group of 6 bits is mapped to one of 64 unique characters. The decoder transforms the Base64 encoding back into their original binary data.
 
 ---
 Compilation on Linux (Debian-based distros):
